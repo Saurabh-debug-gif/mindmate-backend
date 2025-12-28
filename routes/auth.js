@@ -8,7 +8,7 @@ const router = express.Router();
    HEALTH CHECK
 ===================== */
 router.get("/", (req, res) => {
-  res.send("Auth API is running");
+  res.json({ status: "Auth API running" });
 });
 
 /* =====================
@@ -22,19 +22,25 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Email and password required" });
     }
 
-    const exists = await User.findOne({ email });
-    if (exists) {
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    const user = new User({ username, email, password });
+    const user = new User({
+      username: username || email.split("@")[0],
+      email,
+      password
+    });
+
     await user.save();
 
     req.login(user, (err) => {
       if (err) {
         return res.status(500).json({ error: "Auto-login failed" });
       }
-      res.json({
+
+      res.status(201).json({
         message: "Registered successfully",
         user: {
           id: user._id,
@@ -44,6 +50,7 @@ router.post("/register", async (req, res) => {
       });
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Registration failed" });
   }
 });
@@ -54,12 +61,14 @@ router.post("/register", async (req, res) => {
 router.post("/login", (req, res, next) => {
   passport.authenticate("local", (err, user) => {
     if (err) return next(err);
+
     if (!user) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
-    req.logIn(user, (err) => {
+    req.login(user, (err) => {
       if (err) return next(err);
+
       res.json({
         message: "Login successful",
         user: {
@@ -78,14 +87,17 @@ router.post("/login", (req, res, next) => {
 router.post("/logout", (req, res) => {
   req.logout(() => {
     req.session.destroy(() => {
-      res.clearCookie("mindmate.sid");
+      res.clearCookie("mindmate.sid", {
+        sameSite: "none",
+        secure: true
+      });
       res.json({ message: "Logged out successfully" });
     });
   });
 });
 
 /* =====================
-   SESSION CHECK
+   AUTH CHECK
 ===================== */
 router.get("/me", (req, res) => {
   if (!req.user) {

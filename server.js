@@ -14,24 +14,32 @@ const moodRoutes = require("./routes/mood");
 const app = express();
 
 /* =====================
-   BASIC CORS (NO BLOCKS)
+   CORS (Firebase → Render)
 ===================== */
-app.use(cors());
-app.use(express.json());
+app.use(cors({
+  origin: "https://mindmate-auth.web.app",
+  credentials: true
+}));
 
 /* =====================
-   SESSION (TEMP – WORKS ON RENDER)
+   BODY PARSER
+===================== */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+/* =====================
+   SESSION (CROSS-DOMAIN SAFE)
 ===================== */
 app.use(
   session({
     name: "mindmate.sid",
-    secret: process.env.SESSION_SECRET || "mindmate_secret",
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false
+      secure: true,        // REQUIRED (HTTPS)
+      sameSite: "none"     // REQUIRED (Firebase ↔ Render)
     }
   })
 );
@@ -51,15 +59,15 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/mood", moodRoutes);
 
 /* =====================
-   MONGODB (RENDER SAFE)
+   MONGODB
 ===================== */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB error:", err));
+  .catch(err => console.error("❌ MongoDB error:", err));
 
 /* =====================
-   START SERVER (RENDER SAFE)
+   START SERVER
 ===================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
