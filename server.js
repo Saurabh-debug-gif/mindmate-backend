@@ -1,3 +1,11 @@
+/**
+ * MindMate Backend – Production Server
+ * Works with:
+ * - Firebase Hosting (Frontend)
+ * - Render (Backend)
+ * - Express Session + Passport
+ */
+
 require("dotenv").config();
 
 const express = require("express");
@@ -13,23 +21,31 @@ const moodRoutes = require("./routes/mood");
 
 const app = express();
 
-/* =====================
-   CORS (Firebase → Render)
-===================== */
-app.use(cors({
-  origin: "https://mindmate-auth.web.app",
-  credentials: true
-}));
+/* ======================================================
+   🔒 TRUST PROXY (CRITICAL FOR RENDER + HTTPS COOKIES)
+   MUST be before session middleware
+====================================================== */
+app.set("trust proxy", 1);
 
-/* =====================
-   BODY PARSER
-===================== */
+/* ======================================================
+   🌍 CORS (Firebase → Render, Cookies Allowed)
+====================================================== */
+app.use(
+  cors({
+    origin: "https://mindmate-auth.web.app",
+    credentials: true
+  })
+);
+
+/* ======================================================
+   📦 BODY PARSERS
+====================================================== */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =====================
-   SESSION (CROSS-DOMAIN SAFE)
-===================== */
+/* ======================================================
+   🍪 SESSION (CROSS-DOMAIN, PRODUCTION-SAFE)
+====================================================== */
 app.use(
   session({
     name: "mindmate.sid",
@@ -38,37 +54,37 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,        // REQUIRED (HTTPS)
-      sameSite: "none"     // REQUIRED (Firebase ↔ Render)
+      secure: true,        // HTTPS only (Render + Firebase)
+      sameSite: "none"     // Required for cross-domain cookies
     }
   })
 );
 
-/* =====================
-   PASSPORT
-===================== */
+/* ======================================================
+   🔐 PASSPORT AUTH
+====================================================== */
 app.use(passport.initialize());
 app.use(passport.session());
 require("./config/passport")(passport);
 
-/* =====================
-   ROUTES
-===================== */
+/* ======================================================
+   🚏 ROUTES
+====================================================== */
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/mood", moodRoutes);
 
-/* =====================
-   MONGODB
-===================== */
+/* ======================================================
+   🗄️ MONGODB CONNECTION
+====================================================== */
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.error("❌ MongoDB error:", err));
+  .catch((err) => console.error("❌ MongoDB error:", err));
 
-/* =====================
-   START SERVER
-===================== */
+/* ======================================================
+   🚀 START SERVER (RENDER SAFE)
+====================================================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
